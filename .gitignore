@@ -1,0 +1,8 @@
+node_modules
+.idea
+.firebase
+
+no-git
+package-lock.json
+*/package-lock.json
+*/*/package-lock.json

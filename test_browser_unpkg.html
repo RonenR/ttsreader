@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+    <style>
+        [data-ws-onclick] {
+            cursor: pointer;
+        }
+
+        [onclick] {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div data-ws-show-if="isSignedIn"><p>Welcome <span data-ws-label="user.name"></span></p></div>
+    <div data-ws-show-if-not="isSignedIn"><p>Sign in to start</p></div>
+
+    <button data-ws-onclick="foo">Foo</button>
+    <button data-ws-onclick="fooParent.foo">Nested Foo</button>
+    <button data-ws-onclick="fooParent2.foo">Nested Foo2</button>
+
+    <input id="input_id" data-ws-onclick="copy:" value="test value 4" type="text"/>
+    <button data-ws-onclick="copy:#input_id" value="test value 3" >Copy</button>
+    <script>
+        window.wsGlobals = window.wsGlobals || {};
+        wsGlobals.foo = function() {
+            alert('data-ws-hooks working! :)');
+        }
+
+        var fooParent = {};
+
+        fooParent.foo = function () {
+            alert('data-ws-hooks nesting working! :)');
+        }
+
+        wsGlobals.fooParent2 = {};
+        wsGlobals.fooParent2.foo = function () {
+            alert('data-ws-hooks nesting working through wsGlobals! :)');
+        }
+
+    </script>
+
+    <!--<script src="https://unpkg.com/web_page_state/build/bundle.min.js"/>-->
+    <script src="https://unpkg.com/data-ws-hooks/build/bundle.js"/>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="build/bundle.js"></script>
+</head>
+<body>
+    <script>
+        let tts = wsGlobals.TtsEngine;
+        let shouldSpeak = false;
+        let currentEl;
+
+        console.log(tts);
+        tts.init({
+            onInit: (voices) => {
+                console.log('init tts with voices: ', voices);
+                let ul = document.querySelector('ul');
+                if (ul) {
+                    for (const voice of voices) {
+                        let el = document.createElement("li");
+                        el.innerHTML = voice.name + ", " + voice.lang + ", " + voice.voiceURI;
+                        ul.append(el);
+                    }
+                }
+            },
+
+            onStart: () => {
+                console.log('tts started');
+                currentEl.scrollIntoView();
+            },
+
+            onDone: () => {
+                console.log('tts done');
+                if (shouldSpeak) {
+                    caretProgress();
+                    tts.speakOut(currentEl.innerHTML);
+                }
+            }
+        });
+
+        function speak() {
+            shouldSpeak = true;
+            if (!currentEl) {
+                caretProgress();
+            }
+            tts.speakOut(currentEl.innerHTML);
+        }
+
+        function stop() {
+            shouldSpeak = false;
+            tts.stop();
+        }
+
+        function toggleSpeak() {
+            if (shouldSpeak) {
+                stop();
+            } else {
+                speak();
+            }
+        }
+
+        function caretProgress() {
+            if (!currentEl) {
+                currentEl = document.querySelector('main');
+                currentEl = currentEl.firstElementChild;
+            } else {
+                if (currentEl instanceof Element)
+                currentEl = currentEl.nextElementSibling;
+            }
+        }
+    </script>
+    <div style="position: fixed;top: 0;">
+        <button onclick="toggleSpeak()">Speak</button>
+    </div>
+    <br/><br/>
+    <ul id="voicesList"></ul>
+    <main>
+        <p>1. Some text to read</p>
+        <p>2. Hello!</p>
+        <p>3. Ronen</p>
+        <p>4. Some more text to read</p>
+        <p>5. Some text to read</p>
+        <p>6. Some text to read</p>
+        <p>7. Some text to read</p>
+        <p>8. Some text to read</p>
+        <p>9. Some text to read</p>
+        <p>10. Some text to read</p>
+    </main>
+</body>
+</html>

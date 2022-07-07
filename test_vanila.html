@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <button onclick="play()">Play</button>
+</body>
+    <script>
+        speechSynthesis.getVoices();
+        let shouldSpeak = false;
+        let counter = 0;
+        let utter = new SpeechSynthesisUtterance('some text');
+        utter.onend = onend;
+
+        function onend() {
+            if (!shouldSpeak) {
+                return;
+            }
+
+            utter.text = "count to " + counter;
+            counter++;
+            window.speechSynthesis.speak(utter);
+        }
+
+        function play() {
+            utter.lang = "ro-RO";
+            utter.voiceURI = "Google UK English Female";
+            //utter.voiceURI = "Fiona";
+            console.log(speechSynthesis.getVoices());
+            for (const voice of speechSynthesis.getVoices()) {
+                if (voice.voiceURI==utter.voiceURI) {
+                    utter.voice = voice;
+                    break;
+                }
+            }
+            shouldSpeak = !shouldSpeak;
+            onend();
+        }
+    </script>
+</html>
