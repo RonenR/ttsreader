@@ -1,7 +1,7 @@
 {
   "name": "ttsreader",
-  "version": "1.0.13",
-  "description": "Pure tts wrapper for the web-speech-api speech synthesis",
+  "version": "1.0.14",
+  "description": "Text to Speech wrapper, player and helpers for the web-speech-api speech synthesis",
   "main": "index.js",
   "scripts": {
     "test": "node test.js",
@@ -13,5 +13,22 @@
   "private": false,
   "dependencies": {
     "locales": "file:../locales"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RonenR/ttsreader.git"
+  },
+  "keywords": [
+    "tts",
+    "ttsreader",
+    "text to speech",
+    "web speech api",
+    "text player",
+    "text reader",
+    "speech synthesis"
+  ],
+  "bugs": {
+    "url": "https://github.com/RonenR/ttsreader/issues"
+  },
+  "homepage": "https://ttsreader.com/"
 }
