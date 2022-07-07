@@ -3,6 +3,7 @@ node_modules
 .firebase
 
 no-git
+_no-git
 package-lock.json
 */package-lock.json
 */*/package-lock.json

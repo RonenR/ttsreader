@@ -17,6 +17,8 @@ To use in your own html / js code use one of the following methods:
 
 ## How to use?
 
+### The tts engine itself:
+
 `let tts = wsGlobals.TtsEngine;`
 OR
 `import {TtsEngine} from "tts-engine"`
@@ -55,6 +57,23 @@ Then:
             tts.stop();
         }
 
+### The player widget:
+`import {MicWidget} from "./widgets/mic-widget.jsx";`
+`import {render} from "react-dom";`
+
+`let container = document.createElement('div');
+container.setAttribute("style","text-align:right;margin-top:10px");
+render(<MicWidget
+isDictationEnabled = {Boolean(window.webkitSpeechRecognition)}
+blockId = {element.id}
+onStart = {onMicStart}
+onStop = {onMicStop}
+isSelectionDisabled={Boolean(expectedInputLang)}
+lang = {expectedInputLang || docInputLang || appState.prefs.dictationLangCode || "en"}
+setDictationLanguage = {setDictationLanguage}
+registerToAppState={registerToAppState}
+/>, container);
+element.append(container);`
         
 ## Showcases
 
