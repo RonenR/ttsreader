@@ -1,3 +1,3 @@
-exports.TtsEngine = require('/helpers/ttsEngine');
+exports.TtsEngine = require('./helpers/ttsEngine').TtsEngine;
 
 

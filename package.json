@@ -1,11 +1,11 @@
 {
   "name": "ttsreader",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Text to Speech wrapper, player and helpers for the web-speech-api speech synthesis",
   "main": "index.js",
   "scripts": {
     "test": "node test.js",
-    "build": "mkdir build; browserify browserify.js > build/bundle.js; terser build/bundle.js -c drop_console=true > build/bundle.min.js; git add .; npm version patch -m \"Release %s\" -f; git push;",
+    "build": "mkdir build; browserify browserify.js > build/bundle.js; terser build/bundle.js -c drop_console=true > build/bundle.min.js;",
     "prepublishOnly": "mkdir build; browserify browserify.js > build/bundle.js; terser build/bundle.js -c drop_console=true > build/bundle.min.js; git add .; npm version patch -m \"Release %s\" -f; git push;"
   },
   "author": "Ronen Rabinovici",

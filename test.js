@@ -1,3 +1,3 @@
-const TtsEngine = require("./index");
+const TtsEngine = require("./index").TtsEngine;
 
 console.log(TtsEngine);
