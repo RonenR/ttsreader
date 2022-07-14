@@ -25,7 +25,7 @@ exports.TtsEngine = {
     _speakTimeout: null,
     _canceledAtMs: 0,
 
-    init: (listener) => {
+    init: function (listener) {
         if (listener) {
             this.listener = listener;
         }
