@@ -25,15 +25,12 @@ exports.TtsEngine = {
     _speakTimeout: null,
     _canceledAtMs: 0,
 
-    init: function(listener) {
-        if (listener!=null) {
+    init: (listener) => {
+        if (listener) {
             this.listener = listener;
         }
         this._populateVoices();
-        let self = this;
-        if (speechSynthesis.onvoiceschanged !== undefined) {
-            speechSynthesis.onvoiceschanged = function () { self._populateVoices(); };
-        }
+        speechSynthesis.onvoiceschanged = () => { this._populateVoices(); };
     },
 
     setListener: function (listener) {
@@ -110,13 +107,10 @@ exports.TtsEngine = {
     _populateVoices: function () {
         let voices = window.speechSynthesis.getVoices();
         if (voices && voices.length>0) {
-            if (this.voices==null || this.voices.length==0) {
-                this.voices = voices;
-                //console.log(voices);
-                this._setBestMatchingVoice(this.voice, null, null);
-            }
+            this.voices = voices;
+            this._setBestMatchingVoice(this.voice, null, null);
 
-            if (this.listener!=null && this.listener.onInit!==undefined) {
+            if (this.listener && this.listener.onInit) {
                 this.listener.onInit(this.voices);
             }
         }
