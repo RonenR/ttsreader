@@ -1,41 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta charset="UTF-8">
-    <title>Title</title>
-    <script src="build/bundle.js"></script>
+    <title>Test TTSReader Engine</title>
+    <style>
+        .highlight {
+            background-color: yellow;
+        }
+    </style>
 </head>
 <body>
+    <select id="voice_selector"></select>
+    <div>
+        <button id="toggle_speech_btn" onclick="toggleSpeak()">Speak</button>
+    </div>
+    <br/><br/>
+    <ul id="voicesList"></ul>
+    <main>
+        <p>1. Some text to read. </p>
+        <p>2. Hello!</p>
+        <p>3. Ronen. </p>
+        <p>3.1 some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. </p>
+        <p>4. Some more text to read. </p>
+        <p>5. Some text to read. </p>
+        <p>6. Some text to read. </p>
+        <p>7. Some text to read. </p>
+        <p>8. Some text to read. </p>
+        <p>9. Some text to read. </p>
+        <p>10. Some text to read. </p>
+    </main>
+    <!--<script src="https://unpkg.com/ttsreader/build/bundle.min.js"></script>-->
+    <script src="build/bundle.js"></script>
     <script>
+        function populateVoices(voices) {
+            console.log('init tts with voices: ', voices);
+            let el = document.querySelector('#voice_selector');
+            if (el) {
+                for (const voice of voices) {
+                    let option = document.createElement("option");
+                    option.innerHTML = voice.name + ", " + voice.lang + ", " + voice.voiceURI;
+                    option.value = voice.voiceURI;
+                    el.append(option);
+                }
+            }
+            document.getElementById('voice_selector').value = "Google UK English Female";
+        }
+
+        function onStart (ev) {
+            console.log('tts started, at: ', new Date());
+            updateUiByState();
+        }
+
+        function onEnd(ev) {
+            console.log('tts done, with ev = ', ev);
+            if (shouldSpeak) {
+                caretProgress();
+                if (currentEl) {
+                    speakOutText(currentEl.textContent);
+                } else {
+                    speak(); // ie start from beginning
+                }
+            }
+        }
+
+        function speakOutText(txt) {
+            tts.speakOut(txt);
+        }
+
         let tts = wsGlobals.TtsEngine;
         let shouldSpeak = false;
         let currentEl;
 
-        console.log(tts);
+        //console.log(tts);
+
+
         tts.init({
             onInit: (voices) => {
-                console.log('init tts with voices: ', voices);
-                let ul = document.querySelector('ul');
-                if (ul) {
-                    for (const voice of voices) {
-                        let el = document.createElement("li");
-                        el.innerHTML = voice.name + ", " + voice.lang + ", " + voice.voiceURI;
-                        ul.append(el);
-                    }
-                }
+                populateVoices(voices);
             },
 
             onStart: () => {
-                console.log('tts started');
-                currentEl.scrollIntoView();
+                onStart();
             },
 
             onDone: () => {
-                console.log('tts done');
-                if (shouldSpeak) {
-                    caretProgress();
-                    tts.speakOut(currentEl.innerHTML);
-                }
+                onEnd();
             }
         });
 
@@ -44,12 +94,18 @@
             if (!currentEl) {
                 caretProgress();
             }
-            tts.speakOut(currentEl.innerHTML);
+            tts.setVoiceByUri(document.getElementById("voice_selector").value);
+            let txt = currentEl.textContent;
+            //txt = "some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. "
+            speakOutText(txt);
+            document.getElementById('toggle_speech_btn').innerHTML = "Stop";
         }
 
         function stop() {
             shouldSpeak = false;
             tts.stop();
+            updateUiByState();
+            document.getElementById('toggle_speech_btn').innerHTML = "Speak";
         }
 
         function toggleSpeak() {
@@ -69,23 +125,21 @@
                 currentEl = currentEl.nextElementSibling;
             }
         }
+
+        function updateUiByState() {
+            if (shouldSpeak) {
+                if (currentEl) {
+                    document.querySelectorAll("p").forEach((el) => {
+                        if (el!=currentEl) {
+                            el.classList.remove("highlight");
+                        } else {
+                            currentEl.classList.add("highlight");
+                        }
+                    });
+                    currentEl.scrollIntoView();
+                }
+            }
+        }
     </script>
-    <div style="position: fixed;top: 0;">
-        <button onclick="toggleSpeak()">Speak</button>
-    </div>
-    <br/><br/>
-    <ul id="voicesList"></ul>
-    <main>
-        <p>1. Some text to read</p>
-        <p>2. Hello!</p>
-        <p>3. Ronen</p>
-        <p>4. Some more text to read</p>
-        <p>5. Some text to read</p>
-        <p>6. Some text to read</p>
-        <p>7. Some text to read</p>
-        <p>8. Some text to read</p>
-        <p>9. Some text to read</p>
-        <p>10. Some text to read</p>
-    </main>
 </body>
 </html>

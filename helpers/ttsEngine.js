@@ -1,11 +1,21 @@
-const {Languages} = require("locales");
+function codeToLanguageCodeOnly (code) {
+    if (code == null || code.length < 2) {
+        return "";
+    }
+
+    return  code.toLowerCase().split("-")[0].split("_")[0];
+}
+
+function doCodesShareLanguage (a,b) {
+    return codeToLanguageCodeOnly(a) == codeToLanguageCodeOnly(b);
+}
 
 exports.TtsEngine = {
 
     DEFAULT_LANG: "en",
     voice: null,
     voices: null,
-    rate: 0.9,
+    rate: 1,
     utteranceId: 0,
     startedAndNotTerminatedCounter: 0,
     listener: null,  // includes: {onInit, onStart, onDone}
@@ -31,7 +41,7 @@ exports.TtsEngine = {
     },
 
     /// Assumes voices was populated.
-    /// If voice, voiceURI, lang were not available, then it checks whether ther current voice is available to keep.
+    /// If voice, voiceURI, lang were not available, then it checks whether the current voice is available to keep.
     /// If current voice is available it is kept. Otherwise, the first voice in list is selected.
     ///
     _setBestMatchingVoice: function(voice, voiceURI, lang) {
@@ -41,7 +51,7 @@ exports.TtsEngine = {
 
         if (voice) {
             for (const iVoice of this.voices) {
-                if (iVoice == voice) {
+                if (iVoice.voiceURI == voice.voiceURI) {
                     this.voice = iVoice;
                     return iVoice.voiceURI;
                 }
@@ -58,8 +68,13 @@ exports.TtsEngine = {
         }
 
         if (lang) {
+            // If current voice already has the looked for lang, do nothing:
+            if (doCodesShareLanguage(this.voice.lang, lang)) {
+                return this.voice.voiceURI;
+            }
+
             for (const iVoice of this.voices) {
-                if (Languages.doCodesShareLanguage(iVoice.lang, lang)) {
+                if (doCodesShareLanguage(iVoice.lang, lang)) {
                     this.voice = iVoice;
                     return iVoice.voiceURI;
                 }
@@ -74,19 +89,31 @@ exports.TtsEngine = {
             }
         }
 
+        for (const iVoice of this.voices) {
+            if (iVoice.default) {
+                this.voice = iVoice;
+                return this.voice.voiceURI;
+            }
+        }
+
+        for (const iVoice of this.voices) {
+            if (doCodesShareLanguage(iVoice.lang, this.DEFAULT_LANG)) {
+                this.voice = iVoice;
+                return this.voice.voiceURI;
+            }
+        }
+
         this.voice = this.voices[0];
         return this.voice.voiceURI;
     },
 
     _populateVoices: function () {
         let voices = window.speechSynthesis.getVoices();
-        if (voices!=null && voices.length>0) {
-            let isFirstInit = this.voices == null;
-
+        if (voices && voices.length>0) {
             if (this.voices==null || this.voices.length==0) {
                 this.voices = voices;
                 //console.log(voices);
-                this._setBestMatchingVoice(this.voice, this.DEFAULT_LANG);
+                this._setBestMatchingVoice(this.voice, null, null);
             }
 
             if (this.listener!=null && this.listener.onInit!==undefined) {
@@ -172,7 +199,7 @@ exports.TtsEngine = {
             window.speechSynthesis.pause();
             window.speechSynthesis.resume();
             self._solveChromeBug();
-        }, 2000);
+        }, 10000);
     },
 
     _prepareTextForSynthesis: function (text) {
@@ -214,7 +241,7 @@ exports.TtsEngine = {
         utterance.text = text;
 
         if (this.voice==null) {
-            this._setBestMatchingVoice(null, null, this.DEFAULT_LANG);
+            this._setBestMatchingVoice(null, null, null);
         }
         //console.log('voice is: ', this.voice);
         utterance.lang = this.voice.lang;
@@ -223,8 +250,12 @@ exports.TtsEngine = {
         utterance.rate = this.rate;
         let self = this;
 
+        utterance.onmark = function (ev) {
+            console.log('onmark ', ev);
+        }
+
         utterance.onstart = function (ev) {
-            //console.log('start');
+            console.log('onstart ', ev);
             self._defaultOnStart(ev);
             if (self.listener && self.listener.onStart) {
                 self.listener.onStart();
@@ -233,7 +264,7 @@ exports.TtsEngine = {
 
         utterance.onboundary = function(event) {
             // TODO: use this to mark specific word.
-            //console.log(event.name + ' boundary reached after ' + event.elapsedTime + ' milliseconds.', event);
+            console.log('onboundary: ' + event.name + ' boundary reached after ' + event.elapsedTime + ' milliseconds.', event);
             // event looks like:
             /*
             * bubbles: false

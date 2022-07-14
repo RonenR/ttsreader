@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="UTF-8">
+    <title>Test Google Voices Bug</title>
+</head>
+<body>
+    <select id="voice_selector"></select>
+    <div>
+        <button id="toggle_speech_btn" onclick="toggleSpeak()">Speak</button>
+    </div>
+    <br/><br/>
+    <ul id="voicesList"></ul>
+    <main>
+        <p>1. Some text to read. </p>
+        <p>2. Hello!</p>
+        <p>3. Ronen. </p>
+        <p>4. Some more text to read. </p>
+        <p>5. Some text to read. </p>
+        <p>6. Some text to read. </p>
+        <p>7. Some text to read. </p>
+        <p>8. Some text to read. </p>
+        <p>9. Some text to read. </p>
+        <p>10. Some text to read. </p>
+    </main>
+
+    <script>
+        function populateVoices(voices) {
+            console.log('init tts with voices: ', voices);
+            let el = document.querySelector('#voice_selector');
+            if (el) {
+                for (const voice of voices) {
+                    let option = document.createElement("option");
+                    option.innerHTML = voice.name + ", " + voice.lang + ", " + voice.voiceURI;
+                    option.value = voice.voiceURI;
+                    el.append(option);
+                }
+            }
+            document.getElementById('voice_selector').value = "Google UK English Female";
+        }
+
+        function onStart (ev) {
+            console.log('tts started, with ev = ', ev);
+            currentEl.scrollIntoView();
+        }
+
+        function onEnd(ev) {
+            console.log('tts done, with ev = ', ev);
+            if (shouldSpeak) {
+                caretProgress();
+                if (currentEl) {
+                    speakOutText(currentEl.textContent);
+                } else {
+                    speak(); // ie start from beginning
+                }
+            }
+        }
+
+        function speakOutText(txt) {
+            let utter = new SpeechSynthesisUtterance(txt);
+            let selectedVoiceURI = document.getElementById('voice_selector').value;
+            utter.voice = speechSynthesis.getVoices().filter((voice)=>{
+                if (voice.voiceURI==selectedVoiceURI) {
+                    return voice;
+                }
+            })[0];
+            utter.onstart = onStart;
+            utter.onend = onEnd;
+            speechSynthesis.speak(utter);
+        }
+
+        let voices = speechSynthesis.getVoices();
+        if (voices && voices.length>0) {
+            populateVoices(voices);
+        }
+        speechSynthesis.onvoiceschanged = () => {
+            voices = speechSynthesis.getVoices();
+            populateVoices(voices);
+        }
+
+        let shouldSpeak = false;
+        let currentEl;
+
+        function speak() {
+            shouldSpeak = true;
+            if (!currentEl) {
+                caretProgress();
+            }
+
+            document.getElementById('toggle_speech_btn').innerHTML = "Stop";
+            speakOutText(currentEl.textContent);
+        }
+
+        function stop() {
+            shouldSpeak = false;
+            document.getElementById('toggle_speech_btn').innerHTML = "Speak";
+        }
+
+        function toggleSpeak() {
+            if (shouldSpeak) {
+                stop();
+            } else {
+                speak();
+            }
+        }
+
+        function caretProgress() {
+            if (!currentEl) {
+                currentEl = document.querySelector('main');
+                currentEl = currentEl.firstElementChild;
+            } else {
+                if (currentEl instanceof Element)
+                currentEl = currentEl.nextElementSibling;
+            }
+        }
+    </script>
+</body>
+</html>

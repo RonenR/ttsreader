@@ -17,6 +17,8 @@ To use in your own html / js code use one of the following methods:
 
 ## How to use?
 
+See 'test.html' for a complete example.
+
 ### The tts engine itself:
 
 `let tts = wsGlobals.TtsEngine;`
@@ -57,24 +59,7 @@ Then:
             tts.stop();
         }
 
-### The player widget:
-`import {MicWidget} from "./widgets/mic-widget.jsx";`
-`import {render} from "react-dom";`
 
-`let container = document.createElement('div');
-container.setAttribute("style","text-align:right;margin-top:10px");
-render(<MicWidget
-isDictationEnabled = {Boolean(window.webkitSpeechRecognition)}
-blockId = {element.id}
-onStart = {onMicStart}
-onStop = {onMicStop}
-isSelectionDisabled={Boolean(expectedInputLang)}
-lang = {expectedInputLang || docInputLang || appState.prefs.dictationLangCode || "en"}
-setDictationLanguage = {setDictationLanguage}
-registerToAppState={registerToAppState}
-/>, container);
-element.append(container);`
-        
 ## Showcases
 
 This is used on the following sites:
@@ -94,3 +79,13 @@ This is used on the following sites:
   - https://github.com/RonenR/ttsreader
 - To publish an updated version - simply run `npm publish`, it will commit & push updates both to github and npm.
 
+# Important practical non-obvious lessons we learned about tts:
+1. You cannot send too many chars to REMOTE tts voice. It jams. Probably - the whole text is processed at once, and some mp3 is generated on the server?
+   1. 38,000 is too much. It basically never starts.
+   2. Local voices (at least on mac) worked well.
+2. With Google's voices - they will use the correct voice only sometimes. It's not consistent at all! (On Mac.) // TODO: Test on Windows! 
+   1. Solution: If you send a single utterance - it reads with a consistent voice.
+   2. Problem: if they get the wrong voice - it will mess up reading for a large portion of the text...
+   3. Sent google a bug report: https://bugs.chromium.org/p/chromium/issues/detail?id=1344469
+3. onboundary does not work with Google voices. So - we have to send small chunks anyhow...
+4. Of course - the famous google voice terminating itself after some circa 15 secs...
