@@ -25,40 +25,11 @@ See 'test.html' for a complete example.
 OR
 `import {TtsEngine} from "tts-engine"`
 
-Then:
-        
-        tts.init({
-            onInit: (voices) => {
-                console.log('init tts with voices: ', voices);
-                let ul = document.querySelector('ul');
-                if (ul) {
-                    for (const voice of voices) {
-                        let el = document.createElement("li");
-                        el.innerHTML = voice.name + ", " + voice.lang + ", " + voice.voiceURI;
-                        ul.append(el);
-                    }
-                }
-            },
+See test.html for real example on use. [test.html](test.html)
 
-            onStart: () => {
-                console.log('tts started');
-                // Update UI, such as: currentEl.scrollIntoView();
-            },
-
-            onDone: () => {
-                console.log('tts done');
-                // Move to next speakable text here if needed.
-            }
-        });
-
-        function speak() {
-            tts.speakOut(currentEl.innerHTML);
-        }
-
-        function stop() {
-            tts.stop();
-        }
-
+# Tests Documentation
+Since there are so many different platfrom-browser combos, we have to carefully test on each.
+Documentation bout it is here: [TESTS.md](TESTS.md)
 
 ## Showcases
 
