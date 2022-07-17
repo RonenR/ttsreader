@@ -40,19 +40,22 @@ exports.TtsEngine = {
     /// Assumes voices was populated.
     /// If voice, voiceURI, lang were not available, then it checks whether the current voice is available to keep.
     /// If current voice is available it is kept. Otherwise, the first voice in list is selected.
-    ///
-    _setBestMatchingVoice: function(voice, voiceURI, lang) {
+    /// NOTE: 'lang' is only lang, no 'locale' - ie no accent
+    setBestMatchingVoice: function(voice, voiceURI, lang) {
         if (this.voices == null || this.voices.length == 0) {
             return "";
         }
 
-        if (voice) {
-            for (const iVoice of this.voices) {
-                if (iVoice.voiceURI == voice.voiceURI) {
-                    this.voice = iVoice;
-                    return iVoice.voiceURI;
-                }
+        if (!voice && !voiceURI && !lang) {
+            if (this.voice && this.voice.voiceURI) {
+                voiceURI = this.voice.voiceURI;
+            } else {
+                lang = this.DEFAULT_LANG;
             }
+        }
+
+        if (voice) {
+            voiceURI = voice.voiceURI || voiceURI;
         }
 
         if (voiceURI) {
@@ -70,43 +73,54 @@ exports.TtsEngine = {
                 return this.voice.voiceURI;
             }
 
-            for (const iVoice of this.voices) {
-                if (doCodesShareLanguage(iVoice.lang, lang)) {
-                    this.voice = iVoice;
-                    if (iVoice.localService) {
-                        return iVoice.voiceURI;
+            let filteredVoices = this.voices.filter((iVoice)=>{
+                return doCodesShareLanguage(iVoice.lang, lang);
+            });
+
+            if (filteredVoices && filteredVoices.length>0) {
+                if (filteredVoices.length==1) {
+                    this.voice = filteredVoices[0];
+                    return this.voice.voiceURI;
+                } else if (!lang.startsWith("en") && !lang.startsWith("es")) {
+                    this.voice = filteredVoices[0];
+                    return this.voice.voiceURI;
+                } else {
+                    // Now - within those voices - we prefer 'en', 'en-GB', 'en-UK', 'en-US' if lang is en. 'es-ES' if lang is 'es':
+                    // local = 1.5 points;
+                    // no accent = 4 points; -> tops all combos but local good accent.
+                    // good accent = 3 points;
+                    // neutral accent = 2 points; -> local tops remote good accent
+                    // no score accents = 0 points;
+
+                    let selectedVoiceScore = -1;
+                    let selectedVoice;
+                    for (const iVoice of filteredVoices) {
+                        let score = 0;
+
+                        if (iVoice.localService) {
+                            score += 1.5;
+                        }
+
+                        if (iVoice.lang.length == 2) {
+                            score += 4;
+                        } else if (["en-us","en-uk","en-gb","es-es"].indexOf(iVoice.lang.toLowerCase().replace("_","-"))!=-1) {
+                            score += 3;
+                        } else if (["en-in"].indexOf(iVoice.lang.toLowerCase().replace("_","-"))==-1) {
+                            score += 2;
+                        }
+
+                        if (score>selectedVoiceScore) {
+                            selectedVoiceScore = score;
+                            selectedVoice = iVoice;
+                        }
+                    }
+
+                    if (selectedVoice) {
+                        this.voice = selectedVoice;
+                        return this.voice.voiceURI;
                     }
                 }
             }
-
-            if (this.voice && doCodesShareLanguage(this.voice.lang, lang)) {
-                return this.voice.voiceURI;
-            }
-        }
-
-        // No voice, no voiceURI, no lang - or all of these unavailable
-        //   -> return current voice if available:
-        if (this.voice) {
-            for (const iVoice of this.voices) {
-                if (iVoice.voiceURI == this.voice.voiceURI) {
-                    this.voice = iVoice;
-                    return iVoice.voiceURI;
-                }
-            }
-        }
-
-        // No prev voice, or unavailable:
-        for (const iVoice of this.voices) {
-            if (doCodesShareLanguage(iVoice.lang, this.DEFAULT_LANG)) {
-                this.voice = iVoice;
-                if (iVoice.localService) {
-                    return iVoice.voiceURI;
-                }
-            }
-        }
-
-        if (this.voice) {
-            return this.voice.voiceURI;
         }
 
         for (const iVoice of this.voices) {
@@ -123,7 +137,7 @@ exports.TtsEngine = {
         let voices = window.speechSynthesis.getVoices();
         if (voices && voices.length>0) {
             this.voices = voices;
-            this._setBestMatchingVoice(this.voice, null, null);
+            this.setBestMatchingVoice(this.voice, null, null);
 
             if (this.listener && this.listener.onInit) {
                 this.listener.onInit(this.voices);
@@ -132,11 +146,19 @@ exports.TtsEngine = {
     },
 
     setVoiceByUri: function (voiceURI) {
-        this._setBestMatchingVoice(null, voiceURI, null);
+        this.setBestMatchingVoice(null, voiceURI, null);
     },
 
-    setVoice: function (voice) {
-        this._setBestMatchingVoice(voice, null, null);
+    getVoiceURI: function () {
+        if (!this.voice) {
+            this.setBestMatchingVoice();
+        }
+
+        if (this.voice) {
+            return this.voice.voiceURI;
+        }
+
+        return "";
     },
 
     setRate: function (rate) {
@@ -250,7 +272,7 @@ exports.TtsEngine = {
         utterance.text = text;
 
         if (this.voice==null) {
-            this._setBestMatchingVoice(null, null, null);
+            this.setBestMatchingVoice(null, null, null);
         }
         //console.log('voice is: ', this.voice);
         if (this.voice) {
