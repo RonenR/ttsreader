@@ -18,13 +18,13 @@ function doCodesShareLanguage (a,b) {
 exports.TtsEngine = {
 
     DEFAULT_LANG: "en",
-    voice: null,
-    voices: null,
+    voice: {},
+    voices: [],
     rate: 1,
     utteranceId: 0,
     startedAndNotTerminatedCounter: 0,
     listener: null,  // includes: {onInit, onStart, onDone}
-    utterance: null,
+    utterance: {},
 
     _googleBugTimeout: null,
     _speakTimeout: null,
@@ -71,41 +71,56 @@ exports.TtsEngine = {
 
         if (lang) {
             // If current voice already has the looked for lang, do nothing:
-            if (doCodesShareLanguage(this.voice.lang, lang)) {
+            if (this.voice && doCodesShareLanguage(this.voice.lang, lang)) {
                 return this.voice.voiceURI;
             }
 
             for (const iVoice of this.voices) {
                 if (doCodesShareLanguage(iVoice.lang, lang)) {
                     this.voice = iVoice;
-                    return iVoice.voiceURI;
+                    if (iVoice.localService) {
+                        return iVoice.voiceURI;
+                    }
                 }
             }
-        }
 
-        if (this.voice != null) {
-            for (const iVoice of this.voices) {
-                if (iVoice == this.voice) {
-                    return iVoice.voiceURI;
-                }
-            }
-        }
-
-        for (const iVoice of this.voices) {
-            if (iVoice.default) {
-                this.voice = iVoice;
+            if (this.voice && doCodesShareLanguage(this.voice.lang, lang)) {
                 return this.voice.voiceURI;
             }
         }
 
+        // No voice, no voiceURI, no lang - or all of these unavailable
+        //   -> return current voice if available:
+        if (this.voice) {
+            for (const iVoice of this.voices) {
+                if (iVoice.voiceURI == this.voice.voiceURI) {
+                    this.voice = iVoice;
+                    return iVoice.voiceURI;
+                }
+            }
+        }
+
+        // No prev voice, or unavailable:
         for (const iVoice of this.voices) {
             if (doCodesShareLanguage(iVoice.lang, this.DEFAULT_LANG)) {
                 this.voice = iVoice;
-                return this.voice.voiceURI;
+                if (iVoice.localService) {
+                    return iVoice.voiceURI;
+                }
             }
         }
 
-        this.voice = this.voices[0];
+        if (this.voice) {
+            return this.voice.voiceURI;
+        }
+
+        for (const iVoice of this.voices) {
+            this.voice = iVoice;
+            if (iVoice.localService) {
+                return iVoice.voiceURI;
+            }
+        }
+
         return this.voice.voiceURI;
     },
 
@@ -183,11 +198,11 @@ exports.TtsEngine = {
     },
 
     _solveChromeBug: function() {
-        if (this.voice == null) {
+        if (!this.voice) {
             return;
         }
 
-        if (this.voice.voiceURI.toLowerCase().indexOf("google") == -1) {
+        if (this.voice.voiceURI.toLowerCase().indexOf("google") === -1) {
             return;
         }
 
@@ -220,7 +235,7 @@ exports.TtsEngine = {
             return;
         }
 
-        if (!text || text.length==0) {
+        if (!text) {
             if (this.utterance) {
                 this.utterance.onend();
             }
@@ -243,9 +258,11 @@ exports.TtsEngine = {
             this._setBestMatchingVoice(null, null, null);
         }
         //console.log('voice is: ', this.voice);
-        utterance.lang = this.voice.lang;
-        utterance.voiceURI = this.voice.voiceURI; // For a bug in Chrome on Android.
-        utterance.voice = this.voice;
+        if (this.voice) {
+            utterance.lang = this.voice.lang;
+            utterance.voiceURI = this.voice.voiceURI; // For a bug in Chrome on Android.
+            utterance.voice = this.voice;
+        }
         utterance.rate = this.rate;
         let self = this;
 
