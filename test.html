@@ -44,7 +44,7 @@
                     el.append(option);
                 }
             }
-            document.getElementById('voice_selector').value = "Google UK English Female";
+            document.getElementById('voice_selector').value = tts.getVoiceURI();
         }
 
         function onStart (ev) {

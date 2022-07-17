@@ -46,7 +46,7 @@ exports.TtsEngine = {
             return "";
         }
 
-        if (!voice && !voiceURI && !lang) {
+        if ((!voice || !voice.voiceURI) && !voiceURI && !lang) {
             if (this.voice && this.voice.voiceURI) {
                 voiceURI = this.voice.voiceURI;
             } else {
@@ -102,13 +102,14 @@ exports.TtsEngine = {
                         }
 
                         if (iVoice.lang.length == 2) {
-                            score += 4;
-                        } else if (["en-us","en-uk","en-gb","es-es"].indexOf(iVoice.lang.toLowerCase().replace("_","-"))!=-1) {
                             score += 3;
+                        } else if (["en-us","en-uk","en-gb","es-es"].indexOf(iVoice.lang.toLowerCase().replace("_","-"))!=-1) {
+                            score += 4;
                         } else if (["en-in"].indexOf(iVoice.lang.toLowerCase().replace("_","-"))==-1) {
                             score += 2;
                         }
 
+                        console.log('score: ' + score + ' for: ', iVoice);
                         if (score>selectedVoiceScore) {
                             selectedVoiceScore = score;
                             selectedVoice = iVoice;
