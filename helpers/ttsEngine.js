@@ -137,7 +137,11 @@ exports.TtsEngine = {
     _populateVoices: function () {
         let voices = window.speechSynthesis.getVoices();
         if (voices && voices.length>0) {
-            this.voices = voices;
+            this.voices = voices.filter((voice)=>{
+                if (!voice.voiceURI.includes("com.apple.eloquence") && !voice.voiceURI.includes("com.apple.speech.synthesis")) {
+                    return voice;
+                }
+            });
             this.setBestMatchingVoice(this.voice, null, null);
 
             if (this.listener && this.listener.onInit) {
