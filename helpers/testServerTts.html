@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TTS Sentence Reader with SHA-256 IDs</title>
+  <script src="serverTts.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; max-width: 800px; margin: auto; }
+    .sentence { padding: 2px; }
+    .highlight { background-color: yellow; }
+    button { padding: 10px 20px; font-size: 16px; }
+  </style>
+</head>
+<body>
+
+<div id="text">
+  TTSReader is a powerful text-to-speech tool. It reads text out loud sentence by sentence.
+  It uses cloud-based voices for high-quality playback. This demo will buffer and play your content smoothly.
+  The playback starts automatically as soon as the first sentence is ready.
+  You can pause at any time and resume later.
+  It works continuously, buffering ahead for seamless playback.
+</div>
+
+<button id="playBtn">Play</button>
+<button id="pauseBtn">Pause</button>
+
+<script>
+  const textDiv = document.getElementById('text');
+  const playBtn = document.getElementById('playBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+
+  const sentences = textDiv.innerText.match(/[^.!?]+[.!?]+/g).map(s => s.trim());
+  let currentIdx = 0;
+  let isPlaying = false;
+  let initialized = false;
+  const voiceURI = "en-US-Standard-F";
+  const rate = 1.0;
+
+  // Wrap sentences for highlighting
+  textDiv.innerHTML = sentences.map((s, i) =>
+          `<span id='sentence-${i}' class='sentence'>${s} </span>`
+  ).join('');
+
+  function highlightSentence(idx) {
+    document.querySelectorAll('.sentence').forEach(el => el.classList.remove('highlight'));
+    let el = document.getElementById('sentence-' + idx);
+    if (el) {
+      el.classList.add('highlight');
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  async function getHashId(sentence, voiceURI, rate) {
+    const msg = sentence + voiceURI + rate;
+    const msgBuffer = new TextEncoder().encode(msg);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function bufferSentences() {
+    for (let i = currentIdx; i < currentIdx + 5 && i < sentences.length; i++) {
+      const sentence = sentences[i];
+      const id = await getHashId(sentence, voiceURI, rate);
+      if (!ServerTts.buffer.find(u => u.id === id)) {
+        ServerTts.bufferNewUtterance(sentence, voiceURI, rate, id, window.authToken);
+      }
+    }
+  }
+
+  async function trySpeakCurrentSentence(retries = 0) {
+    const id = await getHashId(sentences[currentIdx], voiceURI, rate);
+    const utt = ServerTts.buffer.find(u => u.id === id);
+    if (utt && utt.audio) {
+      ServerTts.speak(id, {
+        onInit: () => { initialized = true; },
+        onReady: async (id) => {
+          const expectedId = await getHashId(sentences[currentIdx], voiceURI, rate);
+          if (isPlaying && id === expectedId) {
+            trySpeakCurrentSentence();
+          }
+        },
+        onStart: async (id) => {
+          const idx = sentences.findIndex(async (s, i) => await getHashId(s, voiceURI, rate) === id);
+          highlightSentence(currentIdx);
+        },
+        onDone: (id) => {
+          currentIdx++;
+          if (isPlaying && currentIdx < sentences.length) {
+            bufferSentences().then(() => trySpeakCurrentSentence());
+          }
+        },
+        onError: (id, error) => {
+          console.error("Error at sentence:", id, error);
+          currentIdx++;
+          if (isPlaying && currentIdx < sentences.length) {
+            bufferSentences().then(() => trySpeakCurrentSentence());
+          }
+        }
+      });
+    } else if (retries < 50 && isPlaying) {
+      setTimeout(() => trySpeakCurrentSentence(retries + 1), 200);
+    } else if (retries >= 50) {
+      console.error("Audio not ready after 10 seconds, skipping...");
+      currentIdx++;
+      bufferSentences().then(() => trySpeakCurrentSentence());
+    }
+  }
+
+  ServerTts.init({
+    onInit: () => { initialized = true; },
+    onReady: async (id) => {
+      const expectedId = await getHashId(sentences[currentIdx], voiceURI, rate);
+      if (isPlaying && id === expectedId) {
+        trySpeakCurrentSentence();
+      }
+    },
+    onStart: async (id) => {
+      const idx = sentences.findIndex(async (s, i) => await getHashId(s, voiceURI, rate) === id);
+      highlightSentence(currentIdx);
+    },
+    onDone: (id) => {
+      currentIdx++;
+      if (isPlaying && currentIdx < sentences.length) {
+        bufferSentences().then(() => trySpeakCurrentSentence());
+      }
+    },
+    onError: (id, error) => {
+      console.error("Error at sentence:", id, error);
+      currentIdx++;
+      if (isPlaying && currentIdx < sentences.length) {
+        bufferSentences().then(() => trySpeakCurrentSentence());
+      }
+    }
+  });
+
+  playBtn.onclick = () => {
+    if (!initialized) return alert("TTS not initialized yet.");
+    if (isPlaying) return;
+    isPlaying = true;
+    bufferSentences().then(() => trySpeakCurrentSentence());
+  };
+
+  pauseBtn.onclick = () => {
+    isPlaying = false;
+    ServerTts.stop();
+  };
+</script>
+
+</body>
+</html>

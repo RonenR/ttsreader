@@ -11,6 +11,8 @@
     </style>
 </head>
 <body>
+    <input type="text" placeholder="server token" id="tokenInput"/>
+    <br/>
     <select id="voice_selector"></select>
     <div>
         <button id="toggle_speech_btn" onclick="toggleSpeak()">Speak</button>
@@ -30,7 +32,7 @@
         <p>9. Some text to read. </p>
         <p>10. Some text to read. </p>
     </main>
-    <!--<script src="https://unpkg.com/ttsreader/build/bundle.min.js"></script>-->
+    <!--<script src="https://unpkg.com/ttsreader@1.0.27/build/bundle.min.js"></script>-->
     <script src="build/bundle.js"></script>
     <script>
         function populateVoices(voices) {
@@ -57,15 +59,35 @@
             if (shouldSpeak) {
                 caretProgress();
                 if (currentEl) {
-                    speakOutText(currentEl.textContent);
+                    let txt = currentEl.innerText;
+                    let bufferArray = [];
+                    let savedCurrentEl = currentEl;
+                    // We'll populate the next 5 elements in the buffer, then we'll set currentElement to the current one.
+                    for (let i = 0; i < 5; i++) {
+                        caretProgress();
+                        if (currentEl) {
+                            bufferArray.push(currentEl.innerText);
+                        }
+                    }
+                    currentEl = savedCurrentEl;
+                    speakOutText(txt, bufferArray);
+
                 } else {
                     speak(); // ie start from beginning
                 }
             }
         }
 
-        function speakOutText(txt) {
-            tts.speakOut(txt);
+        function speakOutText(txt, bufferArray) {
+            // Previously: tts.speakOut(txt);
+            // New - try the server approach:
+            let bufferUtts = [];
+            for (let i = 0; i < bufferArray.length; i++) {
+                bufferUtts.push({text: bufferArray[i], voiceURI: document.getElementById("voice_selector").value, rate: 1.0});
+            }
+            tts.speakAndBuffer({text: txt, voiceURI: document.getElementById("voice_selector").value, rate: 1.0},
+                bufferUtts,
+                document.querySelector("#tokenInput").value);
         }
 
         let tts = wsGlobals.TtsEngine;
@@ -87,7 +109,7 @@
             onDone: () => {
                 onEnd();
             }
-        });
+        }, true);
 
         function speak() {
             shouldSpeak = true;
@@ -95,9 +117,19 @@
                 caretProgress();
             }
             tts.setVoiceByUri(document.getElementById("voice_selector").value);
-            let txt = currentEl.textContent;
-            //txt = "some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. some very long text to test google termination bug. "
-            speakOutText(txt);
+            let txt = currentEl.innerText;
+            let bufferArray = [];
+            let savedCurrentEl = currentEl;
+            // We'll populate the next 5 elements in the buffer, then we'll set currentElement to the current one.
+            for (let i = 0; i < 5; i++) {
+                caretProgress();
+                if (currentEl) {
+                    bufferArray.push(currentEl.innerText);
+                }
+            }
+            currentEl = savedCurrentEl;
+            speakOutText(txt, bufferArray);
+
             document.getElementById('toggle_speech_btn').innerHTML = "Stop";
         }
 
