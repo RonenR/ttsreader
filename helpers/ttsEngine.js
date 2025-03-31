@@ -42,10 +42,12 @@ exports.TtsEngine = {
         },
         onError: (error) => {
             console.log('onError ', error);
+        },
+        onVoicesChanged: (updatedVoices) => {
+            console.log('onVoicesChanged ', updatedVoices);
         }
     },
 
-    // TODO: implement the isToAddServerTTS logic
     init: function (listener, isToAddServerTTS) {
         if (listener) {
             this.setListener(listener, isToAddServerTTS);
@@ -58,6 +60,49 @@ exports.TtsEngine = {
 
     setListener: function (listener, isToAddServerTTS) {
         this.listener = listener || this._defaultListener;
+    },
+
+    removeLocalGoogleVoices: function () {
+        this.voicesIncludingGoogle = [...this.voices];
+        this.voices=this.voices.filter(v=>!v.voiceURI.includes('Google '));
+        this.listener.onVoicesChanged(this.voices);
+    },
+
+    bringBackGoogleVoices: function () {
+        this.voices = [...this.voicesIncludingGoogle];
+        this.voicesIncludingGoogle = null;
+        this.listener.onVoicesChanged(this.voices);
+    },
+
+    runSilentTest: function () {
+        let startTime = Date.now();
+        let timer;
+        const utterance=new SpeechSynthesisUtterance('hi');
+        utterance.volume=0;
+        let voice=speechSynthesis.getVoices().find(v=>v.voiceURI==="Google UK English Male");
+        if (!voice) {
+            return;
+        }
+        utterance.voice = voice;
+        utterance.voiceURI = voice.voiceURI;
+        utterance.lang = voice.lang;
+        timer = setTimeout(()=>{
+            this.removeLocalGoogleVoices();
+        },3000);
+        utterance.onstart=()=>{
+            console.log('onstart in ' + (Date.now()-startTime));
+            clearTimeout(timer);
+            if (this.voicesIncludingGoogle) {
+                this.bringBackGoogleVoices();
+            }
+            speechSynthesis.cancel();
+        };
+        utterance.onend=()=>{
+            console.log('onend in ' + (Date.now()-startTime));
+            clearTimeout(timer);
+        };
+        console.log('calling speak: ' + (Date.now()-startTime));
+        speechSynthesis.speak(utterance);
     },
 
     /// Assumes voices was populated.
