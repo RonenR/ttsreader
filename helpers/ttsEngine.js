@@ -65,6 +65,12 @@ exports.TtsEngine = {
     removeLocalGoogleVoices: function () {
         this.voicesIncludingGoogle = [...this.voices];
         this.voices=this.voices.filter(v=>!v.voiceURI.includes('Google '));
+        if (this.voice && !this.voices.includes(this.voice)) {
+            // Set the voice by language:
+            let lang = this.voice.lang;
+            this.voice = null;
+            this.setBestMatchingVoice(null,null,lang);
+        }
         this.listener.onVoicesChanged(this.voices);
     },
 
@@ -88,10 +94,16 @@ exports.TtsEngine = {
         utterance.lang = voice.lang;
         timer = setTimeout(()=>{
             this.removeLocalGoogleVoices();
+            if (window.gtag) {
+                gtag('event','silent_test_failed',{value:'1'})
+            }
         },3000);
         utterance.onstart=()=>{
             console.log('onstart in ' + (Date.now()-startTime));
             clearTimeout(timer);
+            if (window.gtag) {
+                gtag('event','silent_test_success',{value:'1'})
+            }
             if (this.voicesIncludingGoogle) {
                 this.bringBackGoogleVoices();
             }
@@ -99,6 +111,9 @@ exports.TtsEngine = {
         };
         utterance.onend=()=>{
             console.log('onend in ' + (Date.now()-startTime));
+            if (window.gtag) {
+                gtag('event','silent_test_success',{value:'1'})
+            }
             clearTimeout(timer);
         };
         console.log('calling speak: ' + (Date.now()-startTime));
@@ -419,6 +434,12 @@ exports.TtsEngine = {
         }
 
         utterance.onstart = function (ev) {
+            if (utterance.voice.voiceURI.toLowerCase().includes("google") || utterance.voiceURI?.toLowerCase()?.includes("google")) {
+                console.log('voice URI includes google - do reset');
+                self.removeLocalGoogleVoices = function () {
+                    console.log("removeLocalGoogleVoices reset");
+                };
+            }
             console.log('onstart ', ev);
             self._runOnWebspeechApiStart(ev);
             if (self.listener && self.listener.onStart) {
