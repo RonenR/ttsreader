@@ -5,6 +5,16 @@ window.wsGlobals.TtsEngine = require("./index").TtsEngine;
 },{"./index":5}],2:[function(require,module,exports){
 const { ServerVoices } = require("./serverVoices");
 
+const SERVER_TTS_ENDPOINT_PRODUCTION = "https://us-central1-ttsreader.cloudfunctions.net/tts";
+const SERVER_TTS_ENDPOINT_LOCAL = "http://127.0.0.1:5001/ttsreader/us-central1/tts";
+
+// Set to true for local server:
+const shouldUseLocalWhenInLocalhost = false;
+
+const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+const SERVER_TTS_ENDPOINT = (isDev && shouldUseLocalWhenInLocalhost) ? SERVER_TTS_ENDPOINT_LOCAL : SERVER_TTS_ENDPOINT_PRODUCTION;
+window.SERVER_TTS_ENDPOINT = SERVER_TTS_ENDPOINT;
+
 class ServerTts {
     static voices = ServerVoices.voices;
 
@@ -28,22 +38,66 @@ class ServerTts {
         ServerTts.listener.onInit(ServerTts.voices);
     }
 
-    static async bufferNewUtterance(text, voiceURI, rate, id, authToken, onSuccess, onError) {
-        let utterance = { text, voiceURI, rate, id, wasPlayed: false, audio: null };
+    static async bufferNewUtterance(text, voiceURI, langBCP47, rate, id, authToken, onSuccess, onError, isTest = false) {
+        let utterance = { text, voiceURI, langBCP47, rate, id, wasPlayed: false, audio: null };
         console.log('Buffering: ', utterance.id);
 
         // If already in buffer, simply move it to the end of the buffer array, so it doesn't get wiped out:
         const existingUtterance = ServerTts.buffer.find(u => u.id === id);
-        if (existingUtterance && existingUtterance.audio) {
+        if (existingUtterance) {
             existingUtterance.wasPlayed = false;
+            // Take it out:
             ServerTts.buffer = ServerTts.buffer.filter(u => u.id !== id);
+            // Now push it to the end:
             ServerTts.buffer.push(existingUtterance);
             onSuccess();
             return;
         }
 
+        // If not in buffer, add it to the end of the buffer:
+        ServerTts.buffer.push(utterance);
+
+        // While we're at it, let's remove the first utterances so that we don't memory leak:
+        while ((ServerTts.buffer.length > 20 && ServerTts.buffer[0].wasPlayed) || ServerTts.buffer.length > 50) {
+            ServerTts.buffer.shift();
+        }
+
+        // Now - let's generate the audio:
+        console.log('generating audio for: ', utterance);
+        fetch(SERVER_TTS_ENDPOINT, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${authToken}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                text: text,
+                lang: langBCP47,
+                voice: voiceURI,
+                rate: rate,
+                isTest: Boolean(isTest)
+            })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    onError();
+                    return Promise.reject(); // Stop the chain
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                utterance.audio = new Audio(url);
+                onSuccess(); // ✅ Notify that audio is ready
+            })
+            .catch(err => {
+                onError(err?.message || "Unknown error");
+            });
+
+        return;
+        // Now - let's generate the audio:
         try {
-            const response = await fetch("https://us-central1-ttsreader.cloudfunctions.net/tts", {
+            const response = await fetch(SERVER_TTS_ENDPOINT, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${authToken}`,
@@ -58,7 +112,8 @@ class ServerTts {
             });
 
             if (!response.ok) {
-                throw new Error(`Server returned status ${response.status}`);
+                onError();
+                return;
             }
 
             const blob = await response.blob();
@@ -69,15 +124,43 @@ class ServerTts {
             return;
         }
 
-        ServerTts.buffer.push(utterance);
-
-        // Limit buffer size to 20, clean oldest played items
-        while (ServerTts.buffer.length > 20 && ServerTts.buffer[0].wasPlayed) {
-            ServerTts.buffer.shift();
-        }
-
         // ✅ Notify that audio is ready
         onSuccess();
+    }
+
+    // Send the blob onSuccess. No need to buffer it.
+    static async generateAudioSync(text, voiceURI, langBCP47, rate, id, authToken, onSuccess, onError) {
+        let utterance = { text, voiceURI, langBCP47, rate, id, wasPlayed: false, audio: null };
+        console.log('Generating: ', utterance.id);
+
+        try {
+            const response = await fetch(SERVER_TTS_ENDPOINT, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${authToken}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    text: text,
+                    lang: langBCP47,
+                    voice: voiceURI,
+                    rate: rate
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server returned status ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            // ✅ Notify that audio is ready
+            onSuccess(url); // Sends the blob URL, where the audio is stored. Client can take
+                            //  it from there to Audio element: audio.src = url; or new Audio(url);
+        } catch (error) {
+            onError(error.message);
+            return;
+        }
     }
 
     static async speak(id, listener) {
@@ -114,6 +197,8 @@ class ServerTts {
 
         ServerTts.currentAudio.play().catch(err => {
             listener.onError(id, err.message);
+            utterance.wasPlayed = true;
+            listener.onDone(id);
         });
     }
 
@@ -186,7 +271,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.ar-EG-SalmaNeural",
-            name: "Salma",
+            name: "Salma Premium",
             lang: "ar-EG",
             localService: false,
             default: true,
@@ -195,7 +280,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.ar-EG-ShakirNeural",
-            name: "Aria",
+            name: "Shakir Premium",
             lang: "ar-EG",
             localService: false,
             default: true,
@@ -204,7 +289,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.en-US-AriaNeural",
-            name: "Aria",
+            name: "Aria Premium",
             lang: "en-US",
             localService: false,
             default: true,
@@ -213,7 +298,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.en-US-NovaTurboMultilingualNeural",
-            name: "Nova",
+            name: "Nova Premium",
             lang: "en-US",
             localService: false,
             default: true,
@@ -222,7 +307,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.en-US-AdamMultilingualNeural",
-            name: "Adam",
+            name: "Adam Premium",
             lang: "en-US",
             localService: false,
             default: true,
@@ -267,7 +352,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.fr-FR-VivienneMultilingualNeural",
-            name: "Vivienne",
+            name: "Vivienne Premium",
             lang: "fr-FR",
             localService: false,
             default: true,
@@ -276,7 +361,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.fr-FR-HenriNeural",
-            name: "Henri",
+            name: "Henri Premium",
             lang: "fr-FR",
             localService: false,
             default: true,
@@ -285,7 +370,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.de-DE-ConradNeural",
-            name: "Conrad",
+            name: "Conrad Premium",
             lang: "de-DE",
             localService: false,
             default: true,
@@ -294,7 +379,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.de-DE-SeraphinaMultilingualNeural",
-            name: "Seraphina",
+            name: "Seraphina Premium",
             lang: "de-DE",
             localService: false,
             default: true,
@@ -460,7 +545,7 @@ exports.TtsEngine = {
     rate: 1,
     utteranceId: 0,
     startedAndNotTerminatedCounter: 0,
-    listener: null,  // includes: {onInit, onStart, onDone}
+    listener: null,  // includes: {onInit, onStart, onDone, onError}
     utterance: {},
 
     _googleBugTimeout: null,
@@ -785,36 +870,54 @@ exports.TtsEngine = {
         return decodedText;
     },
 
-    // TODO: For server side tts add a speakAndBuffer(utt, [utt, utt, utt, utt, utt])
+    // When done - sends the URL of the audio blob of the generated audio.
+    // Where utt = {text, voiceURI, rate} No need for id as it will be generated by the engine.
+    generateAudioSync: function (utt, authToken, onDone, onError) {
+        let id = "" + SHA256(utt.text + utt.langBCP47 + utt.voiceURI + utt.rate);
+        ServerTts.generateAudioSync(utt.text, utt.voiceURI, utt.langBCP47, utt.rate, id, authToken, onDone, onError);
+    },
+
     //  where utt = {text, voiceURI, rate} No need for id as it will be generated by the engine.
     speakAndBuffer: function(utt, bufferArray, authToken) {
         if (utt.voiceURI.startsWith("ttsreaderServer")) {
             // Server side tts
 
             let text = this._prepareTextForSynthesis(utt.text);
-            // Generate id by hashing sha256 of: text + voiceURI + rate
-            let id = "" + SHA256(text + utt.voiceURI + utt.rate);
+            if (!text) {
+                this.listener.onStart();
+                this.listener.onDone();
+                return;
+            }
 
-            ServerTts.bufferNewUtterance(text, utt.voiceURI, utt.rate, id, authToken,()=>{
-                ServerTts.speak(id, {
-                    onStart: this.listener.onStart,
-                    onDone: this.listener.onDone,
-                    onError: this.listener.onError
-                });
-            }, (error)=>{
-                console.error('Error buffering utterance: ', error);
-                this.listener.onError('Error buffering utterance: ', error);
-            });
+            // Generate id by hashing sha256 of: text + voiceURI + rate
+            let id = "" + SHA256(text + utt.langBCP47 + utt.voiceURI + utt.rate);
+
+            ServerTts.bufferNewUtterance(text, utt.voiceURI, utt.langBCP47, utt.rate, id, authToken,
+                ()=> {
+                    ServerTts.speak(id, {
+                        onStart: this.listener.onStart,
+                        onDone: this.listener.onDone,
+                        onError: this.listener.onError
+                    });
+                },
+                (error)=> {
+                    console.error('Error buffering utterance: ', error);
+                    this.listener.onError('Error buffering utterance: ', error);
+                },
+                utt.isTest
+            );
 
             // Now buffer the rest of the utts:
             for (const bufferUtt of bufferArray) {
                 let bufferText = this._prepareTextForSynthesis(bufferUtt.text);
-                let bufferId = "" + SHA256(bufferText + bufferUtt.voiceURI + bufferUtt.rate);
-                ServerTts.bufferNewUtterance(bufferText, bufferUtt.voiceURI, bufferUtt.rate, bufferId, authToken,()=>{
+                let bufferId = "" + SHA256(bufferText + bufferUtt.langBCP47 + bufferUtt.voiceURI + bufferUtt.rate);
+                ServerTts.bufferNewUtterance(bufferText, bufferUtt.voiceURI, bufferUtt.langBCP47, bufferUtt.rate, bufferId, authToken,()=>{
                     // Do nothing
-                }, (error)=>{
-                    console.error('Error buffering utterance: ', error);
-                });
+                    }, (error)=>{
+                        console.error('Error buffering utterance: ', error);
+                    },
+                    bufferUtt.isTest
+                );
             }
         } else {
             // Local tts Web Speech API:

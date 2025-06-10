@@ -54,7 +54,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.ar-EG-SalmaNeural",
-            name: "Salma",
+            name: "Salma Premium",
             lang: "ar-EG",
             localService: false,
             default: true,
@@ -63,7 +63,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.ar-EG-ShakirNeural",
-            name: "Aria",
+            name: "Shakir Premium",
             lang: "ar-EG",
             localService: false,
             default: true,
@@ -72,7 +72,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.en-US-AriaNeural",
-            name: "Aria",
+            name: "Aria Premium",
             lang: "en-US",
             localService: false,
             default: true,
@@ -81,7 +81,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.en-US-NovaTurboMultilingualNeural",
-            name: "Nova",
+            name: "Nova Premium",
             lang: "en-US",
             localService: false,
             default: true,
@@ -90,7 +90,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.en-US-AdamMultilingualNeural",
-            name: "Adam",
+            name: "Adam Premium",
             lang: "en-US",
             localService: false,
             default: true,
@@ -135,7 +135,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.fr-FR-VivienneMultilingualNeural",
-            name: "Vivienne",
+            name: "Vivienne Premium",
             lang: "fr-FR",
             localService: false,
             default: true,
@@ -144,7 +144,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.fr-FR-HenriNeural",
-            name: "Henri",
+            name: "Henri Premium",
             lang: "fr-FR",
             localService: false,
             default: true,
@@ -153,7 +153,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.de-DE-ConradNeural",
-            name: "Conrad",
+            name: "Conrad Premium",
             lang: "de-DE",
             localService: false,
             default: true,
@@ -162,7 +162,7 @@ class ServerVoices {
         },
         {
             voiceURI: "ttsreaderServer.azure.de-DE-SeraphinaMultilingualNeural",
-            name: "Seraphina",
+            name: "Seraphina Premium",
             lang: "de-DE",
             localService: false,
             default: true,
