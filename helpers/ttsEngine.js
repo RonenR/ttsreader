@@ -369,36 +369,76 @@ exports.TtsEngine = {
             // Generate id by hashing sha256 of: text + voiceURI + rate
             let id = "" + SHA256(text + utt.langBCP47 + utt.voiceURI + utt.rate);
 
-            ServerTts.bufferNewUtterance(text, utt.voiceURI, utt.langBCP47, utt.rate, id, authToken,
-                ()=> {
+            // Is utt in buffer & renderStatus === "done"? If yes - remove its on ready listener - and simply play it!
+            const existingUtt = ServerTts.buffer.find(u => u.id === id);
+            if (existingUtt && existingUtt.renderStatus === "done") {
+                console.log(`Utterance ${id} already in buffer and ready.`);
+                existingUtt.wasPlayed = false; // Reset the flag to allow re-use.
+                existingUtt.onSuccess = () => {} // Reset the listener to avoid double calls.
+                // Play now:
+                ServerTts.speak(id, {
+                    onStart: this.listener.onStart,
+                    onDone: this.listener.onDone,
+                    onError: this.listener.onError
+                });
+            } else if (existingUtt && existingUtt.renderStatus === "waiting") {
+                console.log(`Utterance ${id} already in buffer and NOT ready.`);
+                existingUtt.wasPlayed = false; // Reset the flag to allow re-use.
+                // Make sure that it has the correct onAudioReady listener. It may override previous one:
+                // TODO: On audio received => speak it. Implement this in ServerTts.js
+                existingUtt.onSuccess = () => {
                     ServerTts.speak(id, {
                         onStart: this.listener.onStart,
                         onDone: this.listener.onDone,
                         onError: this.listener.onError
                     });
-                },
-                (error)=> {
+                };
+                existingUtt.onError = () => {
                     console.error('Error buffering utterance: ', error);
-                    this.listener.onError('Error buffering utterance: ', error);
-                },
-                utt.isTest
-            );
+                    this.listener.onError(error);
+                };
 
-            // Now buffer the rest of the utts:
+            } else {
+                // Either not in buffer, or renderStatus is "error".
+                // We will buffer it now and then speak it - or fire error if buffering fails.
+                ServerTts.bufferNewUtterance(text, utt.voiceURI, utt.langBCP47, utt.rate, id, authToken,
+                    ()=> {
+                        ServerTts.speak(id, {
+                            onStart: this.listener.onStart,
+                            onDone: this.listener.onDone,
+                            onError: this.listener.onError
+                        });
+                    },
+                    (error)=> {
+                        console.error('Error buffering utterance: ', error);
+                        this.listener.onError(error);
+                    },
+                    utt.isTest
+                );
+            }
+
+            // Now buffer the rest of the utts if needed:
             for (const bufferUtt of bufferArray) {
                 let bufferText = this._prepareTextForSynthesis(bufferUtt.text);
                 let bufferId = "" + SHA256(bufferText + bufferUtt.langBCP47 + bufferUtt.voiceURI + bufferUtt.rate);
-                ServerTts.bufferNewUtterance(bufferText, bufferUtt.voiceURI, bufferUtt.langBCP47, bufferUtt.rate, bufferId, authToken,()=>{
-                    // Do nothing
-                    }, (error)=>{
-                        console.error('Error buffering utterance: ', error);
-                    },
-                    bufferUtt.isTest
-                );
+                let existingBufferUtt = ServerTts.buffer.find(u => u.id === bufferId);
+                if (!existingBufferUtt || existingBufferUtt.renderStatus === "error") {
+                    ServerTts.bufferNewUtterance(bufferText, bufferUtt.voiceURI, bufferUtt.langBCP47, bufferUtt.rate, bufferId, authToken,
+                        () => {
+                            // Do nothing, it's simply bg buffering.
+                        }, (error) => {
+                            // Do nothing, it's simply bg buffering.
+                        },
+                        bufferUtt.isTest
+                    );
+                } // Otherwise - it's already in the buffer - do nothing.
             }
         } else {
             // Local tts Web Speech API:
             this.setVoiceByUri(utt.voiceURI);
+            // Make sure rate is within (0.5, 2):
+            utt.rate = Math.min(utt.rate, 2); // max rate allowed is 2
+            utt.rate = Math.max(utt.rate, 0.5); // min rate allowed is 0.5
             this.setRate(utt.rate);
             this.speakOut(utt.text);
         }

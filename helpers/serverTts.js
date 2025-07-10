@@ -33,29 +33,35 @@ class ServerTts {
         ServerTts.listener.onInit(ServerTts.voices);
     }
 
-    static async bufferNewUtterance(text, voiceURI, langBCP47, rate, id, authToken, onSuccess, onError, isTest = false) {
-        let utterance = { text, voiceURI, langBCP47, rate, id, wasPlayed: false, audio: null };
+    // We got here - only if not in buffer, or has error.
+    static async bufferNewUtterance (
+        text, voiceURI, langBCP47, rate, id, authToken, onSuccess, onError, isTest = false,
+        tryCount = 0 ) {
+        let utterance = { text, voiceURI, langBCP47, rate, id, wasPlayed: false, audio: null, renderStatus: "waiting", onSuccess, onError };
         console.log('Buffering: ', utterance.id);
+        tryCount = tryCount || 0;
 
-        // If already in buffer, simply move it to the end of the buffer array, so it doesn't get wiped out:
-        const existingUtterance = ServerTts.buffer.find(u => u.id === id);
-        if (existingUtterance) {
-            existingUtterance.wasPlayed = false;
-            // Take it out:
-            ServerTts.buffer = ServerTts.buffer.filter(u => u.id !== id);
-            // Now push it to the end:
-            ServerTts.buffer.push(existingUtterance);
-            onSuccess();
-            return;
+        async function tryAgain(waitInMs, maxTries) {
+            // Wait for waitInMs[ms] and try again:
+            await new Promise(resolve => setTimeout(resolve, waitInMs));
+            if (tryCount < maxTries) {
+                console.log(`Retrying to generate audio for ${utterance.id}, attempt ${tryCount + 1}`);
+                ServerTts.bufferNewUtterance(text, voiceURI, langBCP47, rate, id, authToken, onSuccess, onError, isTest, tryCount + 1);
+            } else {
+                console.error(`Failed to generate audio for ${utterance.id} after 3 attempts`);
+                // Take it out of the buffer, as it failed to generate:
+                ServerTts.buffer = ServerTts.buffer.filter(u => u.id !== id);
+                onError("Failed buffering ", utterance.id);
+            }
         }
 
-        // If not in buffer, add it to the end of the buffer:
-        ServerTts.buffer.push(utterance);
+        // Make sure it's not already in the buffer, as we don't want duplicates, errors, etc.
+        ServerTts.buffer = ServerTts.buffer.filter(u => u.id !== id);
+        ServerTts.buffer.push(utterance); // So we know it's in the process of being generated.
 
-        // While we're at it, let's remove the first utterances so that we don't memory leak:
-        while ((ServerTts.buffer.length > 20 && ServerTts.buffer[0].wasPlayed) || ServerTts.buffer.length > 50) {
-            ServerTts.buffer.shift();
-        }
+        // If not in buffer, generate audio - and if successful, add it to the buffer.
+        // If audio generation fails, for a reason other than 429 - try again after 500ms, up to 3 times.
+        // If it fails with 429 - it means user's quota reached.
 
         // Now - let's generate the audio:
         console.log('generating audio for: ', utterance);
@@ -69,58 +75,46 @@ class ServerTts {
                 text: text,
                 lang: langBCP47,
                 voice: voiceURI,
-                rate: rate,
+                rate: utterance.rate >= 0.95 ? 1 : utterance.rate,
                 isTest: Boolean(isTest)
             })
         })
             .then(response => {
-                if (!response.ok) {
-                    onError();
+                if (response.ok) {
+                    return response.blob();
+                } else {
+                    if (response.status === 429) {
+                        // Take it out of the buffer, as it failed to generate:
+                        ServerTts.buffer = ServerTts.buffer.filter(u => u.id !== id);
+                        // User reached his quota, notify the listener:
+                        onError(429);
+                    } else {
+                        tryAgain(500, 3); // Retry after 500ms, up to 3 times
+                    }
                     return Promise.reject(); // Stop the chain
                 }
-                return response.blob();
+
             })
             .then(blob => {
+                console.log("Got AUDIO for: ", utterance.text);
                 const url = URL.createObjectURL(blob);
-                utterance.audio = new Audio(url);
-                onSuccess(); // ✅ Notify that audio is ready
+                utterance.audio = (new Audio(url));
+                utterance.audio.playbackRate = utterance.rate >= 0.95 ? utterance.rate : 1,
+                utterance.renderStatus = "done"; // Mark as done
+                utterance.onSuccess(); // ✅ Notify that audio is ready
+
+                try {
+                    // While we're at it, let's remove the first utterances so that we don't memory leak:
+                    while ((ServerTts.buffer.length > 50 && ServerTts.buffer[0].wasPlayed) || ServerTts.buffer.length > 50) {
+                        ServerTts.buffer.shift();
+                    }
+                } catch (e) {
+                    // Do nothing, as we'll just keep it in the buffer.
+                }
             })
             .catch(err => {
-                onError(err?.message || "Unknown error");
+                tryAgain(500, 3); // Retry after 500ms, up to 3 times
             });
-
-        return;
-        // Now - let's generate the audio:
-        try {
-            const response = await fetch(SERVER_TTS_ENDPOINT, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${authToken}`,
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    text: text,
-                    lang: voiceURI.replace("ttsreaderServer.gcp.","").split("-").slice(0, 2).join("-"),
-                    voice: voiceURI,
-                    rate: rate
-                })
-            });
-
-            if (!response.ok) {
-                onError();
-                return;
-            }
-
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            utterance.audio = new Audio(url);
-        } catch (error) {
-            onError(error.message);
-            return;
-        }
-
-        // ✅ Notify that audio is ready
-        onSuccess();
     }
 
     // Send the blob onSuccess. No need to buffer it.
@@ -139,7 +133,8 @@ class ServerTts {
                     text: text,
                     lang: langBCP47,
                     voice: voiceURI,
-                    rate: rate
+                    rate: rate,
+                    quality: "48khz_192kbps" // High quality audio. TODO: make it configurable by the user (ie come from the client)
                 })
             });
 
@@ -178,18 +173,16 @@ class ServerTts {
             return;
         }
 
-        listener.onStart(id);
         ServerTts.currentAudio = utterance.audio;
-
         ServerTts.currentAudio.onended = () => {
             utterance.wasPlayed = true;
             listener.onDone(id);
         };
-
         ServerTts.currentAudio.onerror = () => {
             listener.onError(id, "Audio playback failed");
+            listener.onDone(id);
         };
-
+        listener.onStart(id);
         ServerTts.currentAudio.play().catch(err => {
             listener.onError(id, err.message);
             utterance.wasPlayed = true;
@@ -202,6 +195,14 @@ class ServerTts {
         if (ServerTts.currentAudio) {
             ServerTts.currentAudio.pause();
             ServerTts.currentAudio.currentTime = 0;
+        }
+        if (ServerTts.buffer && ServerTts.buffer.length > 0) {
+            // Iterate through the buffer and set all onSuccess to () => {} to avoid unintended playbacks.
+            ServerTts.buffer.forEach(u => {
+                if (u.onSuccess) {
+                    u.onSuccess = () => {}; // Clear the onSuccess callback to avoid unintended playbacks.
+                }
+            });
         }
     }
 }
