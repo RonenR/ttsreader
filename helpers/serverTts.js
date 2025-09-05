@@ -99,6 +99,7 @@ class ServerTts {
                 console.log("Got AUDIO for: ", utterance.text);
                 const url = URL.createObjectURL(blob);
                 utterance.audio = (new Audio(url));
+                utterance.blob = blob; // 👈 this line is here to prevent G.C. from cleaning the blob
                 utterance.audio.playbackRate = utterance.rate >= 0.95 ? utterance.rate : 1,
                 utterance.renderStatus = "done"; // Mark as done
                 utterance.onSuccess(); // ✅ Notify that audio is ready
@@ -118,9 +119,14 @@ class ServerTts {
     }
 
     // Send the blob onSuccess. No need to buffer it.
-    static async generateAudioSync(text, voiceURI, langBCP47, rate, id, authToken, onSuccess, onError) {
+    static async generateAudioSync(text, voiceURI, langBCP47, rate, id, authToken, onSuccess, onError, optionalParamsAsJson) {
         let utterance = { text, voiceURI, langBCP47, rate, id, wasPlayed: false, audio: null };
         console.log('Generating: ', utterance.id);
+
+        let quality = "48khz_192kbps"; // default
+        if (optionalParamsAsJson && optionalParamsAsJson.quality) {
+            quality = optionalParamsAsJson.quality;
+        }
 
         try {
             const response = await fetch(SERVER_TTS_ENDPOINT, {
@@ -134,7 +140,7 @@ class ServerTts {
                     lang: langBCP47,
                     voice: voiceURI,
                     rate: rate,
-                    quality: "48khz_192kbps" // High quality audio. TODO: make it configurable by the user (ie come from the client)
+                    quality: quality
                 })
             });
 
@@ -147,6 +153,20 @@ class ServerTts {
             // ✅ Notify that audio is ready
             onSuccess(url); // Sends the blob URL, where the audio is stored. Client can take
                             //  it from there to Audio element: audio.src = url; or new Audio(url);
+
+
+            /* TODO: Downloadable wavs should be handled as follows here in the comment:
+            const audioElement = new Audio(url);
+            const audioURL = url;
+            if (audioURL) {
+                const link = document.createElement('a');
+                link.href = audioURL;
+                link.download = 'longer-test-4-steve.wav';
+                document.body.appendChild(link);
+                link.click();
+                // Clean up
+                document.body.removeChild(link);
+            }*/
         } catch (error) {
             onError(error.message);
             return;
@@ -157,7 +177,6 @@ class ServerTts {
         ServerTts.stop(); // Safe to run even if not playing.
         console.log('Got speak request, id: ', id);
         const getUtterance = () => ServerTts.buffer.find(u => u.id === id);
-
         let utterance = getUtterance();
         if (!utterance) return ServerTts.listener.onError(id, "Utterance not found in buffer");
 
