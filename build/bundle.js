@@ -238,7 +238,8 @@ if (typeof module != 'undefined') {
 
 // More voices can be selected here from GCP: https://cloud.google.com/text-to-speech/docs/list-voices-and-types
 // Here from MS: https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts
-// MS voice gallery: https://speech.microsoft.com/portal/47e652ae62044c38a3964f2914437ad2/voicegallery
+// MS voice gallery: https://speech.microsoft.com/portal/4b57c39c5b624408ad37b9f87600d23d/voicegallery
+
 /*Aria.mp3
 Christopher.mp3
 Eric.mp3
@@ -253,6 +254,87 @@ Ryan.mp3*/
 
 class ServerVoices {
     static voices = [
+        {
+            voiceURI: "ttsreaderServer.azure.en-US-ShimmerTurboMultilingualNeural",
+            name: "Shimmer Premium",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "f",
+        },
+        {
+            voiceURI: "ttsreaderServer.azure.en-US-SerenaMultilingualNeural",
+            name: "Serena Premium",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "f",
+        },
+        {
+            voiceURI: "ttsreaderServer.azure.en-US-PhoebeMultilingualNeural",
+            name: "Phoebe Premium",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "f",
+        },
+        {
+            voiceURI: "ttsreaderServer.azure.en-US-AvaMultilingualNeural",
+            name: "Ava Premium",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "f",
+        },
+        {
+            voiceURI: "ttsreaderServer.azure.en-US-NancyMultilingualNeural",
+            name: "Nancy Premium",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "f",
+        },
+        {
+            voiceURI: "ttsreaderServer.azure.en-US-DerekMultilingualNeural",
+            name: "Derek Premium",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "m",
+        },
+        {
+            voiceURI: "ttsreaderServer.azure.en-US-DavisMultilingualNeural",
+            name: "Davis Premium",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "m",
+        },
+        {
+            voiceURI: "ttsreaderServer.azure.en-GB-LibbyNeural",
+            name: "Libby Premium",
+            lang: "en-GB",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "f",
+        },
+        {
+            voiceURI: "ttsreaderServer.azure.en-US-ChristopherMultilingualNeural",
+            name: "Christopher Premium",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "m",
+        },
         {
             voiceURI: "ttsreaderServer.azure.en-GB-OllieMultilingualNeural",
             name: "Ollie",
