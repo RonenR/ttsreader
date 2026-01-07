@@ -1,6 +1,6 @@
 {
   "name": "ttsreader",
-  "version": "1.0.34",
+  "version": "1.0.35",
   "description": "Text to Speech wrapper, player and helpers for the web-speech-api speech synthesis",
   "main": "index.js",
   "scripts": {
