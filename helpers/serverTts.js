@@ -4,7 +4,7 @@ const SERVER_TTS_ENDPOINT_PRODUCTION = "https://us-central1-ttsreader.cloudfunct
 const SERVER_TTS_ENDPOINT_LOCAL = "http://127.0.0.1:5001/ttsreader/us-central1/tts";
 
 // Set to true for local server:
-const shouldUseLocalWhenInLocalhost = false;
+const shouldUseLocalWhenInLocalhost = true;
 
 const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const SERVER_TTS_ENDPOINT = (isDev && shouldUseLocalWhenInLocalhost) ? SERVER_TTS_ENDPOINT_LOCAL : SERVER_TTS_ENDPOINT_PRODUCTION;
@@ -99,10 +99,15 @@ class ServerTts {
                 console.log("Got AUDIO for: ", utterance.text);
                 const url = URL.createObjectURL(blob);
                 utterance.audio = (new Audio(url));
+                utterance.audio.setAttribute("preload", "auto");
+                utterance.audio.addEventListener("playing", () => {
+                    console.log((Date.now() % 60000) + ' Ronen log20250106: audio is actually audible now, after: ' + (Date.now() - ServerTts.timeStart) + "ms");
+                });
+                //utterance.audio.load();
                 utterance.blob = blob; // 👈 this line is here to prevent G.C. from cleaning the blob
                 utterance.audio.playbackRate = utterance.rate >= 0.95 ? utterance.rate : 1,
                 utterance.renderStatus = "done"; // Mark as done
-                utterance.onSuccess(); // ✅ Notify that audio is ready
+                utterance.onSuccess(utterance); // ✅ Notify that audio is ready
 
                 try {
                     // While we're at it, let's remove the first utterances so that we don't memory leak:
@@ -118,7 +123,7 @@ class ServerTts {
             });
     }
 
-    // Send the blob onSuccess. No need to buffer it.
+    // Send the blob onSuccess, where there's no need to buffer it - eg - it was for direct download:
     static async generateAudioSync(text, voiceURI, langBCP47, rate, id, authToken, onSuccess, onError, optionalParamsAsJson) {
         let utterance = { text, voiceURI, langBCP47, rate, id, wasPlayed: false, audio: null };
         console.log('Generating: ', utterance.id);
@@ -173,41 +178,75 @@ class ServerTts {
         }
     }
 
-    static async speak(id, listener) {
-        ServerTts.stop(); // Safe to run even if not playing.
-        console.log('Got speak request, id: ', id);
-        const getUtterance = () => ServerTts.buffer.find(u => u.id === id);
-        let utterance = getUtterance();
-        if (!utterance) return ServerTts.listener.onError(id, "Utterance not found in buffer");
+    static timeStart = Date.now();
 
+    static async speakUtterance(utterance, listener, authToken = null) {
+        ServerTts.stop(); // Safe to run even if not playing.
+        let id = utterance.id;
         let waited = 0;
-        while (!utterance.audio && waited < 10000) {
+        while (!utterance.audio && waited < 1000) { // Wait 1 second max - user is expecting play to start instantly...
             await new Promise(r => setTimeout(r, 200));
             waited += 200;
             utterance = getUtterance(); // refresh in case it got updated
         }
-
         if (!utterance.audio) {
-            listener.onError(id, "Audio not available after 10s");
+            // Do a reset - remove from buffer, then buffer again - and speak onready:
+            if (authToken) {
+                ServerTts.buffer = ServerTts.buffer.filter(u => u.id !== utterance.id);
+                ServerTts.bufferNewUtterance(utterance.text, utterance.voiceURI, utterance.langBCP47, utterance.rate, utterance.id, authToken,
+                    (newUtterance)=> {
+                        ServerTts.speakUtterance(newUtterance, {
+                            onStart: this.listener.onStart,
+                            onDone: this.listener.onDone,
+                            onError: this.listener.onError
+                        }); // We'll not pass auth - as we want to limit this to a single attempt.
+                    },
+                    (error)=> {
+                        console.error('Error buffering utterance: ', error);
+                        this.listener.onError(error);
+                    },
+                    utt.isTest
+                );
+            } else {
+                listener.onError("Utterance has no audio");
+            }
             return;
         }
 
+        // Utterance is ready to play -> Play it:
         ServerTts.currentAudio = utterance.audio;
+        ServerTts.currentAudio.playbackRate = utterance.rate >= 0.95 ? utterance.rate : 1;
         ServerTts.currentAudio.onended = () => {
+            console.log((Date.now() % 60000) + ' Ronen log20250106: audio ended');
             utterance.wasPlayed = true;
             listener.onDone(id);
         };
         ServerTts.currentAudio.onerror = () => {
-            listener.onError(id, "Audio playback failed");
+            listener.onError("Audio playback failed with onerror " + utterance.audio.length);
+            // Remove from buffer, as it failed to play, maybe it's corrupt.
+            ServerTts.buffer = ServerTts.buffer.filter(u => u.id !== utterance.id);
             listener.onDone(id);
         };
         listener.onStart(id);
+
+        console.log((Date.now() % 60000) + ' Ronen log20250106: started audio.play()');
+        ServerTts.timeStart = Date.now();
         ServerTts.currentAudio.play().catch(err => {
-            listener.onError(id, err.message);
-            utterance.wasPlayed = true;
+            // Remove from buffer, as it failed to play, maybe it's corrupt.
+            listener.onError("Audio playback failed with exception: " + err.message);
+            utterance.wasPlayed = false;
             listener.onDone(id);
         });
     }
+
+    /*static async speak(id, listener) {
+        console.log('Got speak request, id: ', id);
+        const getUtterance = () => ServerTts.buffer.find(u => u.id === id);
+        let utterance = getUtterance();
+        if (!utterance) return listener.onError("Utterance not found in buffer");
+
+        return ServerTts.speakUtterance(utterance, listener);
+    }*/
 
     static stop() {
         console.log('Got stop request, current audio: ', ServerTts.currentAudio);
