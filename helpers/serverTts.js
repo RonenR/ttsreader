@@ -4,7 +4,7 @@ const SERVER_TTS_ENDPOINT_PRODUCTION = "https://us-central1-ttsreader.cloudfunct
 const SERVER_TTS_ENDPOINT_LOCAL = "http://127.0.0.1:5001/ttsreader/us-central1/tts";
 
 // Set to true for local server:
-const shouldUseLocalWhenInLocalhost = true;
+const shouldUseLocalWhenInLocalhost = false;
 
 const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 const SERVER_TTS_ENDPOINT = (isDev && shouldUseLocalWhenInLocalhost) ? SERVER_TTS_ENDPOINT_LOCAL : SERVER_TTS_ENDPOINT_PRODUCTION;
