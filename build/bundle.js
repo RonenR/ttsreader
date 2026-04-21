@@ -305,6 +305,52 @@ class ServerVoices {
             demo: "/audio/ttsreaderServer.gcp.en-US-Chirp-HD-D.mp3",
         },
         {
+            // xai voices: ara,eve,leo,rex,sal
+            voiceURI: "ttsreaderServer.xai.ara",
+            name: "xAI Ara",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "f",
+        },
+        {
+            voiceURI: "ttsreaderServer.xai.eve",
+            name: "xAI Eve",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "f",
+        },
+        {
+            voiceURI: "ttsreaderServer.xai.leo",
+            name: "xAI Leo",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "m",
+        },
+        {
+            voiceURI: "ttsreaderServer.xai.rex",
+            name: "xAI Rex",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "m",
+        },
+        {
+            voiceURI: "ttsreaderServer.xai.sal",
+            name: "xAI Sal",
+            lang: "en-US",
+            localService: false,
+            default: true,
+            premiumLevel: 2,
+            gender: "m",
+        },
+        {
             voiceURI: "ttsreaderServer.azure.en-US-NovaTurboMultilingualNeural",
             name: "Nova Premium",
             lang: "en-US",
@@ -883,6 +929,9 @@ exports.TtsEngine = {
     /// If current voice is available it is kept. Otherwise, the first voice in list is selected.
     /// NOTE: 'lang' is only lang, no 'locale' - ie no accent
     setBestMatchingVoice: function(voice, voiceURI, lang) {
+
+        // console.log('setBestMatchingVoice', voice, voiceURI, lang);
+
         if (voiceURI && voiceURI.startsWith("azure.")) {
             // An openenig to support ALL azure voices:
             this.voice = { voiceURI: voiceURI, lang: "en-US", name: voiceURI.replace("azure.", "az.") };
@@ -906,6 +955,11 @@ exports.TtsEngine = {
         }
 
         if (voiceURI) {
+
+            if (voiceURI.startsWith("webspeech.")) {
+                voiceURI = voiceURI.replace("webspeech.", "");
+            }
+
             for (const iVoice of this.voices) {
                 if (iVoice.voiceURI == voiceURI) {
                     this.voice = iVoice;
@@ -956,7 +1010,7 @@ exports.TtsEngine = {
                             score += 2;
                         }
 
-                        console.log('score: ' + score + ' for: ', iVoice);
+                        // console.log('score: ' + score + ' for: ', iVoice);
                         if (score>selectedVoiceScore) {
                             selectedVoiceScore = score;
                             selectedVoice = iVoice;
@@ -995,7 +1049,7 @@ exports.TtsEngine = {
         if (isToAddServerTTS) {
             // Add server tts voices
             let additionalVoices = ServerTts.getVoices();
-            console.log('additionalVoices: ', additionalVoices);
+            // console.log('additionalVoices: ', additionalVoices);
             for (const additionalVoice of additionalVoices) {
                 voices.push(additionalVoice);
             }
@@ -1215,6 +1269,11 @@ exports.TtsEngine = {
             }
         } else {
             // Local tts Web Speech API:
+
+            if (utt.voiceURI.startsWith("webspeech.")) {
+                utt.voiceURI = utt.voiceURI.replace("webspeech.", "");
+            }
+
             this.setVoiceByUri(utt.voiceURI);
             // Make sure rate is within (0.5, 2):
             utt.rate = Math.min(utt.rate, 2); // max rate allowed is 2
@@ -1327,7 +1386,7 @@ exports.TtsEngine = {
             utterance = null;
         };
 
-        console.log('tts - ronen right away')
+        console.log('tts - ronen right away ', utterance);
         this._speakUtterance(utterance);
     },
 
